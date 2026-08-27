@@ -269,6 +269,38 @@ to disable). It is pattern-matched and every removal is reported — on that fil
 5 boilerplate paragraphs, 1 masthead logo, 6 headers, 1 licence footnote, and
 177 paragraphs whose inherited two-column indents were cleared.
 
+### Right-to-left, and why two columns exposed it
+
+A manuscript reformatted for IEEE Access came out with the title, authors and
+abstract in the **right-hand** column and the introduction continuing on the
+left. The conversion had not scrambled anything: the source file carried
+`<w:bidi/>` in its section properties, which Word writes whenever the author
+has an RTL editing language installed — Arabic, here — even when every word in
+the document is English.
+
+In one column that flag is invisible, which is how it survives to submission.
+Add a second column and it reverses their order. Section-level direction is now
+cleared with the rest of the page setup. Paragraph-level direction is kept
+wherever the paragraph actually contains RTL script, so a bilingual manuscript
+with an Arabic abstract is not damaged to fix an English one.
+
+### The title block gets its own section
+
+Setting the column count on the only section a manuscript has puts the title,
+authors and abstract into the columns with everything else. The earlier version
+detected this and printed instructions telling the author to insert the section
+break by hand in Word — which is precisely the work they came here to avoid.
+
+retypeset now inserts it. The first body section is known from the parse, so the
+body's section properties are copied, set to one column, marked continuous and
+attached to the paragraph before that heading. In OOXML a section break *is* a
+paragraph property, so nothing is added to the text: on the manuscript above,
+463 paragraphs in and 463 out, with 429 equations, 117 display equations, one
+table and six images unchanged.
+
+When the body's first heading cannot be located, nothing is guessed — the
+document stays uniformly two-column and the note says why.
+
 ### Column layout: do not force it
 
 An early version set `w:cols num="2"` on every section for a two-column journal.
