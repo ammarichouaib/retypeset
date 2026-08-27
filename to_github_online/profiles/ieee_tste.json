@@ -1,0 +1,98 @@
+{
+  "id": "ieee_tste",
+  "journal": "IEEE Transactions on Sustainable Energy",
+  "publisher": "IEEE",
+  "template_family": "IEEEtran",
+  "guide_url": "https://journals.ieeeauthorcenter.ieee.org/create-your-ieee-journal-article/",
+  "verified": false,
+  "notes": "Limits transcribed from the publisher's author guide but not re-checked against the live page in this build, so `verified` stays false and every rule reports as a warning. Confirm at `guide_url` and flip `verified` to true once you have.",
+  "scope_keywords": [
+    "renewable energy integration",
+    "wind power",
+    "photovoltaic",
+    "microgrid",
+    "grid",
+    "sustainable energy"
+  ],
+  "structure": {
+    "abstract_max_words": 250,
+    "abstract_paragraphs_max": 1,
+    "keywords_min": 3,
+    "keywords_max": 8,
+    "required_sections": [
+      "abstract",
+      "keywords",
+      "introduction",
+      "conclusion",
+      "references"
+    ],
+    "section_order": [
+      "abstract",
+      "keywords",
+      "introduction",
+      "methods",
+      "results",
+      "discussion",
+      "conclusion",
+      "acknowledgements",
+      "references"
+    ]
+  },
+  "figures": {
+    "single_column_mm": 88.9,
+    "one_half_column_mm": 140.0,
+    "double_column_mm": 181.0,
+    "dpi_halftone": 300,
+    "dpi_combination": 600,
+    "dpi_line_art": 600,
+    "accepted_formats": [
+      "tif",
+      "tiff",
+      "eps",
+      "pdf",
+      "png",
+      "jpg",
+      "jpeg"
+    ],
+    "rejected_formats": [
+      "emf",
+      "wmf",
+      "bmp",
+      "gif"
+    ],
+    "caption_position": "below",
+    "table_caption_position": "above"
+  },
+  "references": {
+    "style": "numeric",
+    "csl_file": "ieee.csl",
+    "in_text_format": "[n]"
+  },
+  "latex": {
+    "document_class": "IEEEtran",
+    "class_options": [
+      "journal",
+      "10pt"
+    ],
+    "bibliography_style": "IEEEtran",
+    "template_family": "IEEEtran"
+  },
+  "docx": {
+    "body_font": "Times New Roman",
+    "body_size_pt": 10.0,
+    "line_spacing": 1.0,
+    "columns": 2,
+    "page_size": "letter",
+    "margins_mm": {
+      "top": 19,
+      "bottom": 25,
+      "left": 16,
+      "right": 16
+    },
+    "line_numbers": false,
+    "heading_numbering": "roman"
+  },
+  "sources": {
+    "all": "https://journals.ieeeauthorcenter.ieee.org/create-your-ieee-journal-article/"
+  }
+}
