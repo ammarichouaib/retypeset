@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local secrets -- never commit API keys
+.streamlit/secrets.toml
+
+# Working output
+parsed/
+rendered/
+out/
+
+# Node, for paper/build_docx.js
+node_modules/
+package-lock.json
+package.json
+
+# Trained models are personal to the machine that made them; the corrections
+# they came from are kept (see models/.gitignore).
+*.joblib
+
+# Remembers which GitHub repository to publish to. Local setting.
+tools/publish_config.json

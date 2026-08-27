@@ -66,6 +66,7 @@ retypeset/template_docx.py
 retypeset/template_profile.py
 run_parse.py
 run_render.py
+tests/test_docx_layout.py
 tests/test_latex_body.py
 tests/test_retypeset.py
 tests/test_template_profile.py

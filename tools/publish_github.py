@@ -134,11 +134,45 @@ def get_token(arg: str | None) -> str:
         pass
     print("\nA GitHub token is needed. Settings -> Developer settings -> "
           "Personal access tokens -> Tokens (classic),\nscopes `repo` and "
-          "`workflow`. Nothing is echoed as you paste.")
-    token = getpass.getpass("token: ").strip()
+          "`workflow`.")
+    print("  EASIEST FIX: skip this prompt entirely. Open a NEW terminal and run:\n"
+          "       setx GITHUB_TOKEN <the token>\n"
+          "  then close and reopen the terminal (or double-click the .bat again) -\n"
+          "  it will be picked up automatically next time, with no typing/pasting here.")
+
+    if not sys.stdin.isatty():
+        raise Fail(
+            "no terminal is attached to read a token from (this can happen when "
+            "double-clicking the .bat in some setups).\n"
+            "Set it once with:   setx GITHUB_TOKEN <the token>\n"
+            "then reopen the terminal and run this again - OR pass it directly:\n"
+            "       python tools\\publish_github.py --token <the token>"
+        )
+
+    print("\n  You can now paste the token below.\n"
+          "  In cmd.exe: right-click to paste (Ctrl+V also works on Windows 10/11).\n"
+          "  Nothing will appear on screen as you type or paste - that is normal,\n"
+          "  not a sign it isn't working. Press Enter when done.")
+
+    token = ""
+    for attempt in range(3):
+        try:
+            token = getpass.getpass("token: ").strip()
+        except Exception as exc:                       # some terminals break getpass
+            print(f"  (hidden input failed here: {exc})")
+            print("  falling back to VISIBLE input - the token will be shown as you type/paste.")
+            token = input("token (visible): ").strip()
+        if token:
+            break
+        print("  got nothing - press Enter only after pasting/typing the token.")
     if not token:
-        raise Fail("no token given")
-    print("  tip: to avoid pasting it every time, run this once in a terminal\n"
+        raise Fail(
+            "no token given after 3 tries. Avoid this prompt entirely by running:\n"
+            "       setx GITHUB_TOKEN <the token>\n"
+            "   (then reopen the terminal) or:\n"
+            "       python tools\\publish_github.py --token <the token>"
+        )
+    print("  tip: to avoid this prompt next time, run this once in a terminal\n"
           "       and open a new one afterwards:   setx GITHUB_TOKEN <the token>")
     return token
 
@@ -285,6 +319,25 @@ def commit_and_push(out: Path, slug: str, token: str, message: str,
         run(["remote", "add", "origin", url], out)
     else:
         run(["remote", "set-url", "origin", url], out)
+
+    # A repository that already has history, published from a folder that no
+    # longer exists -- uploaded by hand, or by GitHub Desktop from somewhere
+    # else -- would otherwise be rejected as a non-fast-forward, and the usual
+    # workaround (force) throws away its history. Adopting the remote's last
+    # commit as this folder's parent instead makes the next commit an ordinary
+    # one, and because `git add -A` stages deletions too, whatever the remote
+    # has that this folder does not is *removed* in that same commit. That is
+    # what cleans up a repository someone has been uploading files into.
+    if not run(["rev-parse", "--verify", "HEAD"], out, check=False,
+               quiet=True).stdout.strip():
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        header = ["-c", f"http.extraheader=AUTHORIZATION: basic {basic}"]
+        fetched = run(["fetch", "--depth", "1", "origin", branch], out,
+                      check=False, extra=header)
+        if fetched.returncode == 0:
+            run(["reset", "--soft", "FETCH_HEAD"], out)
+            print(f"  adopted the existing history of origin/{branch}; files it "
+                  "has and this folder does not will be removed by this commit")
 
     run(["add", "-A"], out)
     staged = run(["diff", "--cached", "--name-only"], out).stdout.strip()
