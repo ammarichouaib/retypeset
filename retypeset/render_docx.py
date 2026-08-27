@@ -24,6 +24,7 @@ rebuild path and are listed in the report rather than attempted silently.
 
 from __future__ import annotations
 
+import copy
 import re
 import shutil
 import stat
@@ -38,6 +39,29 @@ from docx.shared import Mm, Pt
 
 from . import cleanup
 from .ir import Manuscript, SectionRole
+
+# Roles that open the body of a paper. The first of these marks the end of the
+# title block, which is where a two-column journal wants its section break.
+_BODY_ROLES = frozenset({
+    SectionRole.INTRODUCTION, SectionRole.RELATED_WORK, SectionRole.THEORY,
+    SectionRole.METHODS, SectionRole.EXPERIMENTAL, SectionRole.RESULTS,
+    SectionRole.RESULTS_DISCUSSION, SectionRole.DISCUSSION,
+    SectionRole.NOMENCLATURE,
+})
+
+# "1 Introduction", "I. INTRODUCTION", "1. Background" -- the fallback when no
+# role was resolved, which is common in a manuscript with no heading styles.
+_OPENS_BODY_RE = re.compile(r"^\s*(?:1|I)\s*[.)\s]\s*\S|^\s*introduction\b",
+                            re.I)
+
+# Arabic, Hebrew, Syriac, Thaana and the Arabic presentation forms. A paragraph
+# holding any of these keeps its own direction; everything else is being pushed
+# right-to-left by an editor setting rather than by its content.
+_RTL_RE = re.compile(r"[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]")
+
+
+def _has_rtl_text(text: str) -> bool:
+    return bool(_RTL_RE.search(text or ""))
 from .profile import JournalProfile
 
 _CAPTION_RE = re.compile(
@@ -125,11 +149,58 @@ class DocxRestyler:
             section.left_margin = Mm(d.margins_mm.get("left", 25))
             section.right_margin = Mm(d.margins_mm.get("right", 25))
 
+        self._clear_bidi(doc)
         self._apply_columns(doc, d.columns)
         self.notes.append(
             f"Page set to {d.page_size.upper()}, margins "
             f"{d.margins_mm.get('left', 25):g} mm."
         )
+
+    def _clear_bidi(self, doc: Document) -> None:
+        r"""Remove right-to-left layout from the section properties.
+
+        Word writes `<w:bidi/>` into `sectPr` whenever the author has an RTL
+        editing language enabled -- Arabic or Hebrew -- even when every word in
+        the document is English. In a single-column manuscript it is invisible,
+        which is why it survives to submission unnoticed.
+
+        Add a second column and it stops being invisible: the columns fill
+        right to left. The title, authors and abstract appear in the *right*
+        column and the introduction continues in the left, which reads as a
+        catastrophically broken conversion and is in fact one flag in the
+        source file. Every journal this tool targets sets text left to right,
+        so the flag is cleared with the rest of the page setup.
+
+        Paragraph-level direction is left alone unless the paragraph contains
+        no RTL script at all: a genuinely bilingual manuscript -- an Arabic
+        abstract, say -- must keep its direction.
+        """
+        cleared = 0
+        for section in doc.sections:
+            for tag in ("w:bidi", "w:rtlGutter"):
+                el = section._sectPr.find(qn(tag))
+                if el is not None:
+                    section._sectPr.remove(el)
+                    cleared += 1
+
+        paras = 0
+        for para in doc.paragraphs:
+            pPr = para._p.find(qn("w:pPr"))
+            if pPr is None:
+                continue
+            bidi = pPr.find(qn("w:bidi"))
+            if bidi is None or _has_rtl_text(para.text):
+                continue
+            pPr.remove(bidi)
+            paras += 1
+
+        if cleared or paras:
+            self.notes.append(
+                f"Right-to-left layout removed from {cleared} section "
+                f"element(s)" + (f" and {paras} paragraph(s)" if paras else "")
+                + ". Word adds this when an RTL editing language is enabled; "
+                "in two columns it makes the text flow into the right-hand "
+                "column first.")
 
     def _apply_columns(self, doc: Document, want: int) -> None:
         """Set column counts without destroying an existing title-block layout.
@@ -178,16 +249,94 @@ class DocxRestyler:
             )
             return
 
+        if want >= 2 and self._split_front_matter(doc):
+            for i, section in enumerate(doc.sections):
+                self._columns(section, 1 if i == 0 else want)
+            self.notes.append(
+                f"Title block kept full width: a continuous section break was "
+                f"inserted before the first body section, and the rest of the "
+                f"document set to {want} columns.")
+            return
+
         for section in doc.sections:
             self._columns(section, want)
         self.notes.append(f"Set to {want} column(s) throughout.")
         if want >= 2:
             self.unsupported.append(
                 "The whole document is now two columns, including the title and "
-                "abstract. Journals expect those full width: in Word, put the "
-                "cursor after the abstract and insert Layout > Breaks > "
-                "Continuous, then set the first section back to one column."
+                "abstract, because the first body section could not be located "
+                "automatically. Journals expect the title block full width: in "
+                "Word, put the cursor after the abstract and insert "
+                "Layout > Breaks > Continuous, then set the first section back "
+                "to one column."
             )
+
+    def _first_body_paragraph(self, doc: Document):
+        """The paragraph that starts the body, i.e. the end of the title block.
+
+        Taken from the parsed manuscript rather than from the formatting: the
+        heading that opens the body is known semantically, and matching it by
+        text is more reliable than guessing from style names in a file whose
+        styles are the reason we are here.
+        """
+        titles = [s.title_raw for s in self.ms.body
+                  if s.title_raw and s.role in _BODY_ROLES]
+        if not titles:
+            titles = [s.title_raw for s in self.ms.body
+                      if s.title_raw and _OPENS_BODY_RE.match(s.title_raw.strip())]
+        wanted = {self._norm(t) for t in titles[:1]}
+        if not wanted:
+            return None
+        for para in doc.paragraphs:
+            if self._norm(para.text) in wanted:
+                return para
+        return None
+
+    def _split_front_matter(self, doc: Document) -> bool:
+        r"""Put a continuous section break between the title block and the body.
+
+        This is the step that turns a mechanically correct two-column document
+        into one that looks like the journal's own. Without it the title,
+        authors and abstract are dragged into the left column and the reader
+        meets the paper sideways -- the previous version simply printed
+        instructions telling the author to do it by hand in Word, which is the
+        work they came here to avoid.
+
+        In OOXML a section break *is* a paragraph: `w:sectPr` inside the
+        `w:pPr` of the last paragraph of the section it closes. So the body's
+        own properties are copied, set to one column and marked continuous,
+        and attached to the paragraph before the first body heading. Nothing is
+        added to the text, and the document keeps exactly one visible layout
+        change.
+        """
+        first_body = self._first_body_paragraph(doc)
+        if first_body is None:
+            return False
+        previous = first_body._p.getprevious()
+        while previous is not None and previous.tag != qn("w:p"):
+            previous = previous.getprevious()
+        if previous is None:
+            return False
+        if len(doc.sections) > 1:
+            return False                     # the author already split it
+
+        body_sectPr = doc.sections[-1]._sectPr
+        front = copy.deepcopy(body_sectPr)
+        for tag in ("w:headerReference", "w:footerReference", "w:lnNumType"):
+            for el in front.findall(qn(tag)):
+                front.remove(el)
+        stype = front.find(qn("w:type"))
+        if stype is None:
+            stype = front.makeelement(qn("w:type"), {})
+            front.insert(0, stype)
+        stype.set(qn("w:val"), "continuous")
+
+        pPr = previous.find(qn("w:pPr"))
+        if pPr is None:
+            pPr = previous.makeelement(qn("w:pPr"), {})
+            previous.insert(0, pPr)
+        pPr.append(front)
+        return True
 
     @staticmethod
     def _column_count(section) -> int:
