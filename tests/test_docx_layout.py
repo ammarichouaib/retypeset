@@ -21,14 +21,17 @@ and image counts must come through untouched.
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 from docx import Document
 from docx.oxml.ns import qn
+from docx.shared import Emu, Inches
+from lxml import etree
 
 from retypeset.ir import Manuscript, Section, SectionRole
 from retypeset.profile import get_profile
-from retypeset.render_docx import render_docx
+from retypeset.render_docx import DocxRestyler, render_docx
 
 
 def _write(path: Path, paragraphs: list[str], *, bidi: bool = False) -> Path:
@@ -137,3 +140,133 @@ def test_paragraph_direction_is_kept_where_the_text_is_right_to_left(tmp_path):
         qn("w:pPr")).find(qn("w:bidi"))
     assert kept is not None, "an Arabic paragraph must keep its direction"
     assert dropped is None, "an English paragraph must not be laid out RTL"
+
+
+# -- oversized figures and hand-padded equation numbers ---------------------
+#
+# A real manuscript converted through this path (Nebbar V3, hydraulics) came
+# back with charts running off the page edge and equation numbers wrapped
+# onto their own line, sometimes above the equation. Both traced to content
+# sized for the *source* single-column page and carried unchanged into a
+# narrower two-column one: a figure inserted at the old full column width,
+# and an equation number placed by typing spaces until the cursor reached the
+# old margin. These tests reproduce both in a minimal document.
+
+
+def _png_bytes(width_px: int, height_px: int) -> bytes:
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (width_px, height_px), "white").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _write_with_figure(path: Path, width_emu: int, height_emu: int) -> Path:
+    doc = Document()
+    for text in FRONT:
+        doc.add_paragraph(text)
+    for text in BODY:
+        doc.add_paragraph(text)
+    doc.add_picture(io.BytesIO(_png_bytes(400, 200)),
+                     width=Emu(width_emu), height=Emu(height_emu))
+    doc.save(str(path))
+    return path
+
+
+def _oMath_with_padding(spaces: int, number: str) -> etree._Element:
+    m = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+    w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    pad = " " * spaces
+    xml = (
+        f'<m:oMathPara xmlns:m="{m}" xmlns:w="{w}">'
+        f'<m:oMath><m:r><m:t>x=y</m:t></m:r>'
+        f'<m:r><m:t xml:space="preserve">{pad}</m:t></m:r>'
+        f'<m:d><m:e><m:r><m:t>{number}</m:t></m:r></m:e></m:d>'
+        f'</m:oMath></m:oMathPara>'
+    )
+    return etree.fromstring(xml)
+
+
+def _write_with_equation(path: Path, spaces: int) -> Path:
+    doc = Document()
+    for text in FRONT:
+        doc.add_paragraph(text)
+    for text in BODY:
+        doc.add_paragraph(text)
+    eq_para = doc.add_paragraph()
+    eq_para._p.append(_oMath_with_padding(spaces, "3"))
+    doc.save(str(path))
+    return path
+
+
+def _column_width_emu(profile_id: str, columns: int) -> int:
+    restyler = DocxRestyler.__new__(DocxRestyler)
+    restyler.p = get_profile(profile_id)
+    return restyler._column_width_emu(columns)
+
+
+def test_a_figure_too_wide_for_its_new_column_is_shrunk_to_fit(tmp_path):
+    # 6 inches: comfortably full-width in the single-column source, and wider
+    # than any two-column journal's column.
+    original_cx, original_cy = Inches(6), Inches(3)
+    src = _write_with_figure(tmp_path / "wide.docx", int(original_cx), int(original_cy))
+
+    out = render_docx(src, _manuscript(FRONT, "1 Introduction"),
+                      get_profile("ieee_access"), tmp_path / "out.docx")
+
+    extent = Document(str(out.path)).element.body.find(f".//{qn('wp:extent')}")
+    new_cx, new_cy = int(extent.get("cx")), int(extent.get("cy"))
+    col_width = _column_width_emu("ieee_access", 2)
+
+    assert new_cx <= col_width * 1.01, "the figure must fit its column"
+    # Aspect ratio locked: width and height shrink by the same factor.
+    assert abs((new_cx / new_cy) - (original_cx / original_cy)) < 1e-6
+    assert any("figure" in n.lower() and "column" in n.lower()
+               for n in out.notes)
+
+
+def test_a_figure_that_already_fits_is_left_alone(tmp_path):
+    col_width = _column_width_emu("ieee_access", 2)
+    small_cx, small_cy = int(col_width * 0.8), int(col_width * 0.8 * 0.5)
+    src = _write_with_figure(tmp_path / "small.docx", small_cx, small_cy)
+
+    out = render_docx(src, _manuscript(FRONT, "1 Introduction"),
+                      get_profile("ieee_access"), tmp_path / "out.docx")
+
+    extent = Document(str(out.path)).element.body.find(f".//{qn('wp:extent')}")
+    assert int(extent.get("cx")) == small_cx
+    assert not any("scaled down" in n for n in out.notes)
+
+
+def test_hand_typed_equation_number_padding_becomes_a_tab(tmp_path):
+    src = _write_with_equation(tmp_path / "eq.docx", spaces=120)
+
+    out = render_docx(src, _manuscript(FRONT, "1 Introduction"),
+                      get_profile("ieee_access"), tmp_path / "out.docx")
+
+    doc = Document(str(out.path))
+    eq_para = next(p for p in doc.paragraphs if p._p.find(f".//{qn('m:oMath')}") is not None)
+    texts = [t.text for t in eq_para._p.findall(f".//{qn('m:t')}")]
+    assert "\t" in texts, "the space run must become a real tab character"
+    assert not any(t and t.strip() == "" and len(t) > 1 for t in texts), (
+        "no long literal space run should remain")
+
+    tabs = eq_para._p.find(qn("w:pPr")).find(qn("w:tabs"))
+    tab = tabs.find(qn("w:tab"))
+    assert tab.get(qn("w:val")) == "right"
+    col_width_twips = _column_width_emu("ieee_access", 2) // 635
+    assert int(tab.get(qn("w:pos"))) == col_width_twips
+    assert any("equation number" in n.lower() for n in out.notes)
+
+
+def test_a_short_equation_number_gap_is_left_alone(tmp_path):
+    """A handful of spaces is ordinary spacing, not a margin-reaching hack."""
+    src = _write_with_equation(tmp_path / "eq.docx", spaces=3)
+
+    out = render_docx(src, _manuscript(FRONT, "1 Introduction"),
+                      get_profile("ieee_access"), tmp_path / "out.docx")
+
+    doc = Document(str(out.path))
+    eq_para = next(p for p in doc.paragraphs if p._p.find(f".//{qn('m:oMath')}") is not None)
+    texts = [t.text for t in eq_para._p.findall(f".//{qn('m:t')}")]
+    assert "   " in texts
+    assert not any("equation number" in n.lower() for n in out.notes)

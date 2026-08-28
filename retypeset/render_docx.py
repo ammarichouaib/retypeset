@@ -13,9 +13,21 @@ manuscript with 134 equations that is not a risk worth taking.
 Instead we open the author's own .docx and change only presentation: fonts,
 sizes, line spacing, margins, column count, line numbering, and the styles
 attached to headings and captions. Equations, figures, tables, footnotes and
-field codes are never touched, so they cannot be damaged. The IR is still used
--- it tells us which paragraphs are headings, which are captions, and what the
-target journal requires -- but it is a map, not a source.
+field codes are never touched in their content, so they cannot be damaged.
+The IR is still used -- it tells us which paragraphs are headings, which are
+captions, and what the target journal requires -- but it is a map, not a
+source.
+
+Two geometry-only exceptions. A figure sized for a wide single column
+overflows a narrow two-column one -- inline drawings wider than the column
+they now sit in are scaled down (aspect ratio locked, pixels untouched).
+And an equation number is very often placed with a run of literal space
+characters typed to reach a single-column page's right margin; carried
+unchanged into a narrower column, that run is now longer than the column, so
+it pushes the number onto its own line, or above the equation. That run is
+replaced with a real tab character bound to a right tab stop at the new
+column's width -- the standard Word mechanism for aligning equation numbers.
+Neither touches the mathematics or the image bytes, only where they sit.
 
 What this cannot do: reorder sections, renumber references into a different
 citation style, or synthesise front matter the source lacks. Those need the
@@ -62,7 +74,20 @@ _RTL_RE = re.compile(r"[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]")
 
 def _has_rtl_text(text: str) -> bool:
     return bool(_RTL_RE.search(text or ""))
+
+
 from .profile import JournalProfile
+
+# 1 twip = 1/20 pt = 1/1440 in = 635 EMU (OOXML's fixed length units).
+_TWIP_EMU = 635
+# Matches the w:space set in _columns() -- the column gutter, in twips.
+_COL_GUTTER_TWIPS = 425
+# A drawing within 1% of the column width is a rounding artefact, not overflow.
+_FIGURE_FIT_TOLERANCE = 1.01
+# A run of at least this many literal spaces inside an equation is the
+# "type spaces until it reaches the margin" technique for numbering it, not
+# ordinary spacing.
+_MIN_PADDING_SPACES = 6
 
 _CAPTION_RE = re.compile(
     r"^\s*(fig(?:ure)?|tab(?:le)?|scheme|chart)\s*\.?\s*[A-Z]?\d+", re.I
@@ -155,6 +180,8 @@ class DocxRestyler:
             f"Page set to {d.page_size.upper()}, margins "
             f"{d.margins_mm.get('left', 25):g} mm."
         )
+        self._resize_oversized_figures(doc)
+        self._fix_equation_number_padding(doc)
 
     def _clear_bidi(self, doc: Document) -> None:
         r"""Remove right-to-left layout from the section properties.
@@ -364,8 +391,140 @@ class DocxRestyler:
         for child in list(cols):
             cols.remove(child)
         cols.set(qn("w:num"), str(max(1, n)))
-        cols.set(qn("w:space"), "425")          # ~7.5 mm gutter, in twips
+        cols.set(qn("w:space"), str(_COL_GUTTER_TWIPS))   # ~7.5 mm gutter
         cols.set(qn("w:equalWidth"), "1")
+
+    # -- geometry (figures, equation numbers) -------------------------------
+
+    def _page_text_width_emu(self) -> int:
+        """Usable page width (page minus left/right margins), in EMU."""
+        d = self.p.docx
+        w, _ = (Mm(210), Mm(297)) if d.page_size == "a4" else (Mm(215.9), Mm(279.4))
+        left = Mm(d.margins_mm.get("left", 25))
+        right = Mm(d.margins_mm.get("right", 25))
+        return int(w) - int(left) - int(right)
+
+    def _column_width_emu(self, columns: int) -> int:
+        """Usable width of one column of a `columns`-column section, in EMU."""
+        text_w = self._page_text_width_emu()
+        if columns <= 1:
+            return text_w
+        gutter = _COL_GUTTER_TWIPS * _TWIP_EMU
+        return (text_w - (columns - 1) * gutter) // columns
+
+    def _iter_body_with_column_width(self, doc: Document):
+        """Yield (`w:p` element, column width in EMU) for every paragraph.
+
+        A section break is a `w:sectPr` inside the `w:pPr` of the paragraph
+        that CLOSES the section (or the last child of `w:body`, for the final
+        section) -- so a paragraph's own section is whichever one has not yet
+        been closed when that paragraph is reached.
+        """
+        sections = doc.sections
+        widths = [self._column_width_emu(self._column_count(s)) for s in sections]
+        idx = 0
+        for child in doc.element.body.iterchildren():
+            if child.tag != qn("w:p"):
+                continue
+            yield child, widths[min(idx, len(widths) - 1)]
+            pPr = child.find(qn("w:pPr"))
+            if pPr is not None and pPr.find(qn("w:sectPr")) is not None:
+                idx += 1
+
+    def _resize_oversized_figures(self, doc: Document) -> None:
+        """Shrink inline drawings that no longer fit their column.
+
+        A figure sized to look right spanning a wide single column is, after
+        the column count changes, simply too wide -- it runs into the gutter,
+        the facing column, or the page edge. The pixels are never touched,
+        only the two size records Word keeps for an inline picture
+        (`wp:extent`, the frame, and `a:xfrm/a:ext`, the shape inside it):
+        both are scaled by the same factor so the image is never distorted.
+        """
+        shrunk = 0
+        for para, col_width in self._iter_body_with_column_width(doc):
+            if col_width <= 0:
+                continue
+            for extent in para.findall(f".//{qn('wp:extent')}"):
+                try:
+                    cx = int(extent.get("cx") or 0)
+                    cy = int(extent.get("cy") or 0)
+                except ValueError:
+                    continue
+                if cx <= 0 or cx <= col_width * _FIGURE_FIT_TOLERANCE:
+                    continue
+                ratio = col_width / cx
+                new_cx, new_cy = int(cx * ratio), int(cy * ratio)
+                extent.set("cx", str(new_cx))
+                extent.set("cy", str(new_cy))
+                # The drawing's own frame is fixed above; Word also keeps the
+                # picture shape's extent in sync, or the two disagree on
+                # render. Same ratio, so the aspect ratio cannot drift.
+                drawing = extent.getparent()
+                for ext in drawing.findall(f".//{qn('a:xfrm')}/{qn('a:ext')}"):
+                    try:
+                        ecx, ecy = int(ext.get("cx")), int(ext.get("cy"))
+                    except (TypeError, ValueError):
+                        continue
+                    ext.set("cx", str(int(ecx * ratio)))
+                    ext.set("cy", str(int(ecy * ratio)))
+                shrunk += 1
+        if shrunk:
+            self.notes.append(
+                f"{shrunk} figure(s) were sized for a wider single column and "
+                "ran past the page or the facing column in the new layout; "
+                "scaled down to fit their column, aspect ratio unchanged."
+            )
+
+    def _fix_equation_number_padding(self, doc: Document) -> None:
+        r"""Replace hand-typed right-padding on equation numbers with a tab.
+
+        A very common way to place an equation number is to type the
+        equation, then hit the space bar until the cursor reaches the right
+        margin, then type "(3)". That is invisible in the single-column
+        source -- the padding was measured, by eye, against that page's
+        margin. Carried into a narrower column unchanged, the same number of
+        spaces overshoots the new margin, so Word wraps the number onto its
+        own line, sometimes above the equation, which is the mis-placed
+        equation numbers this renders as.
+
+        The fix is the mechanism Word's own equation numbering uses: one real
+        tab character, plus a right tab stop set at the column's actual
+        width. That stop is written fresh for every match rather than
+        trusting whatever `w:tabs` the paragraph already carries, because
+        those are just as often stale left-over indent tabs from the source
+        layout, not the number's tab stop.
+        """
+        space_run = re.compile(r"^ {%d,}$" % _MIN_PADDING_SPACES)
+        fixed = 0
+        for para, col_width in self._iter_body_with_column_width(doc):
+            if col_width <= 0 or para.find(f".//{qn('m:oMath')}") is None:
+                continue
+            hit = False
+            for t in para.findall(f".//{qn('m:t')}"):
+                if t.text and space_run.match(t.text):
+                    t.text = "\t"
+                    t.set(qn("xml:space"), "preserve")
+                    hit = True
+            if not hit:
+                continue
+            fixed += 1
+            pPr = para.get_or_add_pPr()
+            # CT_PPr's own accessors, not a manual find/insert: `w:tabs` has a
+            # fixed slot in a long, strictly-ordered child sequence, and these
+            # place it correctly regardless of what else the paragraph has.
+            pPr._remove_tabs()
+            tabs = pPr.get_or_add_tabs()
+            tab = tabs.makeelement(qn("w:tab"), {})
+            tab.set(qn("w:val"), "right")
+            tab.set(qn("w:pos"), str(col_width // _TWIP_EMU))
+            tabs.append(tab)
+        if fixed:
+            self.notes.append(
+                f"{fixed} equation number(s) used hand-typed spaces to reach "
+                "the old margin, which overshot the new column; replaced with "
+                "a right tab stop at the column's actual width."
+            )
 
     def _line_numbers(self, doc: Document) -> None:
         if not self.p.docx.line_numbers:

@@ -28,7 +28,7 @@ from . import (  # noqa: F401
     agents, cleanup, learn, review, sectioning, template_profile,
 )
 
-__version__ = "0.8.3"
+__version__ = "0.8.4"
 __all__ = [
     "Manuscript", "Section", "SectionRole",
     "parse_docx", "PandocError", "audit", "format_report",

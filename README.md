@@ -324,6 +324,39 @@ carries explicit `<w:col>` children giving each column's width, and those win �
 a document rewritten to `w:num="1"` while still holding a half-width `<w:col>`
 renders as two columns. The children are cleared.
 
+### A figure sized for one column, dropped into a narrower one
+
+A hydraulics manuscript (Nebbar V3), reformatted for IEEE Transactions on
+Sustainable Energy, came back with charts running off the right edge of the
+page. Nothing had corrupted the images: they were inserted at a width that
+filled a wide single column in the source file, and that literal size —
+`wp:extent`, the drawing's own frame — survived unchanged into a column less
+than half as wide.
+
+Any inline drawing wider than the column it now sits in is scaled down to fit,
+aspect ratio locked (`wp:extent` and the picture shape's own `a:xfrm/a:ext`
+are scaled by the same factor, so the two records Word keeps for one image
+cannot disagree and distort it). Pixels are never touched. On that manuscript:
+5 of 6 figures were oversized for the new column and were scaled to fit it.
+
+### Equation numbers placed by typing spaces to the margin
+
+The same manuscript had equation numbers wrapping onto their own line —
+sometimes above the equation itself. The cause was a habit common enough to be
+almost universal in hand-formatted manuscripts: type the equation, hit the
+space bar until the cursor reaches the page's right margin, then type `(3)`.
+Invisible in the single-column source, because the padding was eyeballed
+against that page's margin — carried into a column less than half as wide, the
+same run of spaces now overshoots the new margin, and Word wraps the number.
+
+The fix uses the same mechanism Word's own equation numbering does: the
+run of at least 6 literal spaces immediately before the number is replaced
+with one real tab character, and a right tab stop is written at the new
+column's actual width — not trusting whatever `w:tabs` the paragraph already
+carries, since those are as often stale indent tabs from the source layout as
+the number's own stop. On the Nebbar manuscript: 59 equation numbers used this
+padding and were converted.
+
 ### What neither route does
 
 - **Citation style conversion.** Plain-text markers cannot be reliably converted
