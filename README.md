@@ -1,4 +1,4 @@
-# retypeset — journal-agnostic manuscript reformatting
+# retypeset journal-agnostic manuscript reformatting
 
 **Status: end to end. Parse → verify → check → generate DOCX and LaTeX.**
 
@@ -8,10 +8,7 @@ DOCX ──parse──> IR (JSON) ──+ journal style profile──> DOCX | La
       implemented, verified   implemented               implemented
 ```
 
-Generated LaTeX compiles to PDF with **zero errors** for both test manuscripts
-under `elsarticle` (16 and 38 pages) and the Diagnostyka profile (10 and 25
-pages). Restyled DOCX preserves native equation, table and picture counts
-exactly.
+Generated LaTeX compiles to PDF with **zero errors** for both test manuscripts under `elsarticle` (16 and 38 pages) and the Diagnostyka profile (10 and 25 pages). Restyled DOCX preserves native equation, table and picture counts exactly.
 
 ## Install
 
@@ -26,11 +23,11 @@ exactly.
 Both bundle Python and pandoc; nothing else has to be installed, and everything
 runs offline on the machine. The only feature that touches the network is the
 optional model peer-review panel, and only when you enter an API key. The
-download is around 150 MB because pandoc is half of it — see
+download is around 150 MB because pandoc is half of it see
 [`packaging/README.md`](packaging/README.md) for the size breakdown and how to
 build it yourself.
 
-**From source** — any platform, and the only way to get the CLI tools:
+**From source** any platform, and the only way to get the CLI tools:
 
 ```bash
 pip install -r requirements.txt
@@ -40,22 +37,16 @@ python run_parse.py "MyPaper.docx" -o parsed    # or the CLI
 
 ## Quick start
 
-The app opens on **Start**: drop in your manuscript, then either pick one of the
-28 built-in journal profiles or upload the publisher's own Word template and let
-retypeset derive a profile from it. Four steps follow — **Start, Verify, Check,
-Generate** — and the sidebar's **Advanced** mode shows every panel as a tab, plus
-local training and the profile the checker is actually using.
+The app opens on **Start**: drop in your manuscript, then either pick one of the 28 built-in journal profiles or upload the publisher's own Word template and let retypeset derive a profile from it. Four steps follow **Start, Verify, Check, Generate** and the sidebar's **Advanced** mode shows every panel as a tab, plus local training and the profile the checker is actually using.
 
-If you see `PandocError: pandoc not found`, the fastest fix is `pip install pypandoc_binary`
-— it bundles a pandoc binary and needs no admin rights or PATH changes. `retypeset` also
-probes `$PANDOC`, PATH, `%LOCALAPPDATA%\Pandoc` and `%PROGRAMFILES%\Pandoc`, so a
+If you see `PandocError: pandoc not found`, the fastest fix is `pip install pypandoc_binary` it bundles a pandoc binary and needs no admin rights or PATH changes. `retypeset` also probes `$PANDOC`, PATH, `%LOCALAPPDATA%\Pandoc` and `%PROGRAMFILES%\Pandoc`, so a
 normal MSI install works too (open a **new** terminal afterwards).
 
 ## Why the previous app produced poor results
 
 The old `app.py` pipeline was `docx → para.text → LLM → LaTeX`. Three fatal properties:
 
-1. **`para.text` returns `""` for OMML equations**, skips `doc.tables` entirely, and never touches images. The model therefore never saw the equations, tables or figures — it invented replacements.
+1. **`para.text` returns `""` for OMML equations**, skips `doc.tables` entirely, and never touches images. The model therefore never saw the equations, tables or figures it invented replacements.
 2. **The LLM regenerated body prose.** Non-deterministic rewriting of a peer-reviewed manuscript is disqualifying regardless of model quality.
 3. **No intermediate representation.** N input formats × M journals needs N×M converters without one.
 
@@ -65,12 +56,12 @@ The old `app.py` pipeline was `docx → para.text → LLM → LaTeX`. Three fata
 
 | File | Role |
 |---|---|
-| `retypeset/ir.py` | The intermediate representation. Publisher-neutral semantics only — never fonts, margins or columns. |
+| `retypeset/ir.py` | The intermediate representation. Publisher-neutral semantics only never fonts, margins or columns. |
 | `retypeset/oox.py` | Direct OOXML inspection. **Ground truth for figures and text**, because Pandoc is lossy (see below). |
 | `retypeset/parse_docx.py` | Pandoc (prose, math, tables) + `oox` (assets, loss recovery) → IR. Entirely rule-based. |
 | `retypeset/audit.py` | Counts primitives in the raw OOXML and compares against the IR. Nothing gets rendered until this is clean. |
 | `retypeset/profile.py` | `JournalProfile` schema + loader for `profiles/*.json`. |
-| `retypeset/compliance.py` | Validates an IR against a profile — the part that pays for itself before any renderer exists. |
+| `retypeset/compliance.py` | Validates an IR against a profile the part that pays for itself before any renderer exists. |
 | `profiles/*.json` | One file per journal. **Adding a journal requires no code.** |
 | `retypeset/assets.py` | Figure conversion: SVG→PDF, TIFF→PNG, EMF→PDF. |
 | `retypeset/render_latex.py` | IR + profile → compilable LaTeX project. |
@@ -84,8 +75,7 @@ The old `app.py` pipeline was `docx → para.text → LLM → LaTeX`. Three fata
 | `run_parse.py` | Parse + audit CLI. |
 | `run_render.py` | Parse + check + generate CLI. |
 
-`run_parse.py` outputs `parsed/<stem>.ir.json`, `parsed/<stem>.audit.txt` and
-`parsed/media/`. Exit code is 0 only when the audit reports no blocking issues.
+`run_parse.py` outputs `parsed/<stem>.ir.json`, `parsed/<stem>.audit.txt` and `parsed/media/`. Exit code is 0 only when the audit reports no blocking issues.
 
 ## The app
 
@@ -98,39 +88,18 @@ Four steps, in the order the work has to happen.
 | **3 Check** | Compliance against the target, submission readiness, and optionally a panel of model referees whose findings must quote your text verbatim. |
 | **4 Generate** | Restyled `.docx` (from your template, or from the profile), a compilable LaTeX project, and the verified IR. |
 
-**Advanced** in the sidebar replaces the wizard with every panel as a tab and
-adds two more: **Training**, and **Profile**, which shows the profile in force
-exactly as the checker sees it. The panels are the same functions; only the
-navigation differs.
+**Advanced** in the sidebar replaces the wizard with every panel as a tab and adds two more: **Training**, and **Profile**, which shows the profile in force exactly as the checker sees it. The panels are the same functions; only the navigation differs.
 
-### Upload your own template — from step 1
+### Upload your own template from step 1
 
-A profile can say *Times New Roman 10 pt, two columns*. It cannot reproduce a
-publisher's title block, author blocks, abstract run style or caption styles.
+A profile can say *Times New Roman 10 pt, two columns*. It cannot reproduce a publisher's title block, author blocks, abstract run style or caption styles. 
 Those live in the template, so the template is offered first rather than last.
 
 Uploading one at step 1 does two things:
 
-1. **Derives a profile from it.** Page size, margins, columns, body font and
-   size, line spacing and line numbering are *read* from the file. Structural
-   limits are *mined* from the instructions publishers leave inside their own
-   templates — "The abstract must be between 150–250 words", "a minimum of three
-   to a maximum of six keywords". Every derived value is shown next to the
-   sentence it came from, and the whole profile is marked `verified: false`, so
-   every rule reports as a warning rather than a failure. Nothing is guessed to
-   fill a field: an unmatched limit stays unset and fires no finding at all.
-2. **Keeps the file for step 4**, where its styles are transplanted into your
-   manuscript.
-
-Optionally seed the derivation from a publisher baseline: the template then
-overrides only what it actually proves. Tick *Save this as a reusable profile*
-and it becomes a normal `profiles/*.json`, available on every future run.
-
-Measured on the two templates in `templates/`: the IEEE template yields two
-columns, Times New Roman, its exact margins, a 250-word abstract limit, numeric
-references and Arabic heading numbering; the ELECTRICA template yields A4, 12 pt,
-25 mm margins, a 250-word abstract limit and 3–6 keywords — the last two written
-three lines apart and spelled out in words. Both are covered by tests.
+1. **Derives a profile from it.** Page size, margins, columns, body font and    size, line spacing and line numbering are *read* from the file. Structural limits are *mined* from the instructions publishers leave inside their own templates "The abstract must be between 150–250 words", "a minimum of three to a maximum of six keywords". Every derived value is shown next to the sentence it came from, and the whole profile is marked `verified: false`, so every rule reports as a warning rather than a failure. Nothing is guessed to fill a field: an unmatched limit stays unset and fires no finding at all.
+2. **Keeps the file for step 4**, where its styles are transplanted into your manuscript. Optionally seed the derivation from a publisher baseline: the template then overrides only what it actually proves. Tick *Save this as a reusable profile* and it becomes a normal `profiles/*.json`, available on every future run.
+Measured on the two templates in `templates/`: the IEEE template yields two columns, Times New Roman, its exact margins, a 250-word abstract limit, numeric references and Arabic heading numbering; the ELECTRICA template yields A4, 12 pt, 25 mm margins, a 250-word abstract limit and 3–6 keywords the last two written three lines apart and spelled out in words. Both are covered by tests.
 
 ## Adding a journal
 
@@ -141,18 +110,10 @@ cp profiles/_template.json profiles/applied_energy.json
 ```
 
 Set `id` to the filename stem, then **delete every key you cannot verify** —
-omitted keys fall back to the schema defaults in `retypeset/profile.py` and produce
-no false failures. Leave `verified: false` until every number came from the
-publisher's own page; unverified profiles report warnings only.
+omitted keys fall back to the schema defaults in `retypeset/profile.py` and produce no false failures. Leave `verified: false` until every number came from the publisher's own page; unverified profiles report warnings only.
 
-Most journals need almost nothing. Per-journal variation is overwhelmingly just
-abstract length, keyword count and required sections, so the usual workflow is
-to copy the publisher baseline (`elsevier_generic.json`, `ieee_transactions.json`,
-`springer_sn.json`, `mdpi.json`) and change three or four numbers. Files whose
-name starts with `_` are ignored by the loader.
-
-Faster still: upload the journal's template at step 1 and save the derived
-profile.
+Most journals need almost nothing. Per-journal variation is overwhelmingly just abstract length, keyword count and required sections, so the usual workflow is to copy the publisher baseline (`elsevier_generic.json`, `ieee_transactions.json`,`springer_sn.json`, `mdpi.json`) and change three or four numbers. Files whose name starts with `_` are ignored by the loader.
+Faster still: upload the journal's template at step 1 and save the derived profile.
 
 ### What ships
 
@@ -169,7 +130,7 @@ profile.
 All the new ones carry `verified: false` and a `guide_url`. Their limits were
 transcribed from the publishers' author guides rather than re-read from the live
 pages at build time, so they report warnings only. Check the numbers you care
-about against the guide and flip the flag — that is a one-line edit, and it is
+about against the guide and flip the flag that is a one-line edit, and it is
 what `verified` is for.
 
 ## Generating output
@@ -191,27 +152,17 @@ python run_render.py "MyPaper.docx" -j ieee_transactions \
 
 Or upload it in the **Generate** tab.
 
-A profile can say *Times New Roman 10 pt, two columns*. It cannot reproduce a
-publisher's title block, author/affiliation blocks, abstract run style, Roman
-section numbering, caption styles or theme fonts — those live in the template's
-`styles.xml`, `theme1.xml` and `numbering.xml`. Publishers already ship those
-files, so the highest-fidelity path is to **transplant** the template rather
+A profile can say *Times New Roman 10 pt, two columns*. It cannot reproduce a publisher's title block, author/affiliation blocks, abstract run style, Roman section numbering, caption styles or theme fonts those live in the template's `styles.xml`, `theme1.xml` and `numbering.xml`. Publishers already ship those files, so the highest-fidelity path is to **transplant** the template rather
 than describe it.
 
-Transplanted: `styles.xml` (merged), `docDefaults`, `theme1.xml`, `numbering.xml`,
-page size, margins, column layout.
+Transplanted: `styles.xml` (merged), `docDefaults`, `theme1.xml`, `numbering.xml`, page size, margins, column layout.
 Untouched: every equation, image, table, footnote and field code.
 
 Two things this gets right that are easy to get wrong:
 
-- **Styles are matched by name, not by styleId.** Word only guarantees ids are
-  unique *within* a document. One test manuscript used ids `a`, `1`, `2`, … so
-  an id-keyed merge matched nothing: the template's `Normal` was appended as an
-  unused second style while the body kept its original look. Matching on name
-  took that file from 0 to 24 styles actually overridden.
+- **Styles are matched by name, not by styleId.** Word only guarantees ids are unique *within* a document. One test manuscript used ids `a`, `1`, `2`, … so an id-keyed merge matched nothing: the template's `Normal` was appended as an unused second style while the body kept its original look. Matching on name took that file from 0 to 24 styles actually overridden.
 - **The manuscript's styleId is kept** when a match is found, because every
-  paragraph in the body already points at it. Inter-style references
-  (`basedOn`, `next`, `link`) are remapped into the manuscript's id space.
+  paragraph in the body already points at it. Inter-style references (`basedOn`, `next`, `link`) are remapped into the manuscript's id space.
 
 ### The two routes work differently, on purpose
 
@@ -223,18 +174,12 @@ Two things this gets right that are easy to get wrong:
 | Risk | essentially none | conversion gaps, all logged |
 
 **DOCX restyles rather than rebuilds** because `python-docx` cannot write OMML.
-Rebuilding would force every equation through LaTeX → MathML → OMML, which needs
-Word's own `MML2OMML.XSL`; any gap in that chain turns an equation into a picture
-or into plain text. On a manuscript with 134 equations that is not a risk worth
-taking. So the restyler changes only presentation — fonts, sizes, spacing,
-margins, column count, line numbering, heading and caption styles — and never
+Rebuilding would force every equation through LaTeX → MathML → OMML, which needs Word's own `MML2OMML.XSL`; any gap in that chain turns an equation into a picture or into plain text. On a manuscript with 134 equations that is not a risk worth taking. So the restyler changes only presentation fonts, sizes, spacing, margins, column count, line numbering, heading and caption styles and never
 touches content.
 
-Verified: for both test manuscripts against all five profiles, the OOXML
-equation, table and picture counts in the output are **identical** to the source.
+Verified: for both test manuscripts against all five profiles, the OOXML equation, table and picture counts in the output are **identical** to the source.
 
-LaTeX has no equivalent option, so it is built from the IR and every conversion
-is recorded in `tex/BUILD.md`.
+LaTeX has no equivalent option, so it is built from the IR and every conversion is recorded in `tex/BUILD.md`.
 
 ### Asset conversion (LaTeX route)
 
@@ -243,15 +188,14 @@ is recorded in `tex/BUILD.md`.
 | svg | pdf | cairosvg → rsvg-convert → Inkscape |
 | tif/bmp/gif | png | Pillow |
 | emf/wmf | pdf | Inkscape or LibreOffice, if installed |
-| png/jpg/pdf/eps | unchanged | — |
+| png/jpg/pdf/eps | unchanged | |
 
 EMF and WMF are the only formats with no dependency-free path. Rather than ship
 a silently wrong figure, they are reported.
 
 ### Removing the previous journal's furniture
 
-Restyling changes presentation, not content — and a manuscript prepared for one
-journal carries a lot of that journal's identity *as content*:
+Restyling changes presentation, not content and a manuscript prepared for one journal carries a lot of that journal's identity *as content*:
 
 - running headers and footers with the journal name and citation line
 - the journal logo, sitting above the title as an inline image
@@ -259,103 +203,56 @@ journal carries a lot of that journal's identity *as content*:
 - a copyright or Creative Commons footnote
 - leftover template instructions the author never deleted
 
-Restyled to Elsevier's rules, a Diagnostyka manuscript came out in correct
-single-column double-spaced form with line numbers — and still had the
-Diagnostyka logo on page 1 and its citation header on every page. The formatting
-was right; the document was unusable.
+Restyled to Elsevier's rules, a Diagnostyka manuscript came out in correct single-column double-spaced form with line numbers and still had the Diagnostyka logo on page 1 and its citation header on every page. The formatting was right; the document was unusable.
 
-`retypeset.cleanup` removes this by default on both Word routes (`--keep-furniture`
-to disable). It is pattern-matched and every removal is reported — on that file:
+`retypeset.cleanup` removes this by default on both Word routes (`--keep-furniture` to disable). It is pattern-matched and every removal is reported on that file:
 5 boilerplate paragraphs, 1 masthead logo, 6 headers, 1 licence footnote, and
 177 paragraphs whose inherited two-column indents were cleared.
 
 ### Right-to-left, and why two columns exposed it
 
-A manuscript reformatted for IEEE Access came out with the title, authors and
-abstract in the **right-hand** column and the introduction continuing on the
-left. The conversion had not scrambled anything: the source file carried
-`<w:bidi/>` in its section properties, which Word writes whenever the author
-has an RTL editing language installed — Arabic, here — even when every word in
+A manuscript reformatted for IEEE Access came out with the title, authors and abstract in the **right-hand** column and the introduction continuing on the left. The conversion had not scrambled anything: the source file carried `<w:bidi/>` in its section properties, which Word writes whenever the author has an RTL editing language installed Arabic, here even when every word in
 the document is English.
 
 In one column that flag is invisible, which is how it survives to submission.
-Add a second column and it reverses their order. Section-level direction is now
-cleared with the rest of the page setup. Paragraph-level direction is kept
-wherever the paragraph actually contains RTL script, so a bilingual manuscript
-with an Arabic abstract is not damaged to fix an English one.
+Add a second column and it reverses their order. Section-level direction is now cleared with the rest of the page setup. Paragraph-level direction is kept wherever the paragraph actually contains RTL script, so a bilingual manuscript with an Arabic abstract is not damaged to fix an English one.
 
 ### The title block gets its own section
 
-Setting the column count on the only section a manuscript has puts the title,
-authors and abstract into the columns with everything else. The earlier version
-detected this and printed instructions telling the author to insert the section
-break by hand in Word — which is precisely the work they came here to avoid.
+Setting the column count on the only section a manuscript has puts the title, authors and abstract into the columns with everything else. The earlier version detected this and printed instructions telling the author to insert the section break by hand in Word which is precisely the work they came here to avoid.
 
-retypeset now inserts it. The first body section is known from the parse, so the
-body's section properties are copied, set to one column, marked continuous and
-attached to the paragraph before that heading. In OOXML a section break *is* a
-paragraph property, so nothing is added to the text: on the manuscript above,
-463 paragraphs in and 463 out, with 429 equations, 117 display equations, one
+retypeset now inserts it. The first body section is known from the parse, so the body's section properties are copied, set to one column, marked continuous and attached to the paragraph before that heading. In OOXML a section break *is* a paragraph property, so nothing is added to the text: on the manuscript above, 463 paragraphs in and 463 out, with 429 equations, 117 display equations, one
 table and six images unchanged.
 
-When the body's first heading cannot be located, nothing is guessed — the
-document stays uniformly two-column and the note says why.
+When the body's first heading cannot be located, nothing is guessed the document stays uniformly two-column and the note says why.
 
 ### Column layout: do not force it
 
 An early version set `w:cols num="2"` on every section for a two-column journal.
-That is wrong, and it visibly broke the first IEEE output: a two-column
-manuscript is not two columns throughout — the title, authors and abstract span
-the full page, and a continuous section break switches the body to two columns.
+That is wrong, and it visibly broke the first IEEE output: a two-column manuscript is not two columns throughout the title, authors and abstract span the full page, and a continuous section break switches the body to two columns.
 Forcing the count collapses the title block into the left column.
 
 The rule is asymmetric, because the risk is:
 
-- **Collapsing to one column is always safe** — one column *is* full width, so
-  there is no title block to destroy. Always applied.
-- **Expanding to two or more** needs the guard: if the document already varies
-  its column count, only the multi-column sections are normalised.
+- **Collapsing to one column is always safe** one column *is* full width, so   there is no title block to destroy. Always applied.
+- **Expanding to two or more** needs the guard: if the document already varies its column count, only the multi-column sections are normalised.
 
-A first attempt made this symmetric, which then left single-column journals like
-Elsevier with a two-column manuscript. Both directions are now tested.
+A first attempt made this symmetric, which then left single-column journals like Elsevier with a two-column manuscript. Both directions are now tested.
 
-Also: setting `w:num` alone is not enough. When `w:equalWidth="0"` the element
-carries explicit `<w:col>` children giving each column's width, and those win —
-a document rewritten to `w:num="1"` while still holding a half-width `<w:col>`
-renders as two columns. The children are cleared.
+Also: setting `w:num` alone is not enough. When `w:equalWidth="0"` the element carries explicit `<w:col>` children giving each column's width, and those win a document rewritten to `w:num="1"` while still holding a half-width `<w:col>`renders as two columns. The children are cleared.
 
 ### A figure sized for one column, dropped into a narrower one
 
-A hydraulics manuscript (Nebbar V3), reformatted for IEEE Transactions on
-Sustainable Energy, came back with charts running off the right edge of the
-page. Nothing had corrupted the images: they were inserted at a width that
-filled a wide single column in the source file, and that literal size —
-`wp:extent`, the drawing's own frame — survived unchanged into a column less
-than half as wide.
+A hydraulics manuscript (Nebbar V3), reformatted for IEEE Transactions on Sustainable Energy, came back with charts running off the right edge of the page. Nothing had corrupted the images: they were inserted at a width that filled a wide single column in the source file, and that literal size `wp:extent`, the drawing's own frame survived unchanged into a column less than half as wide.
 
-Any inline drawing wider than the column it now sits in is scaled down to fit,
-aspect ratio locked (`wp:extent` and the picture shape's own `a:xfrm/a:ext`
-are scaled by the same factor, so the two records Word keeps for one image
-cannot disagree and distort it). Pixels are never touched. On that manuscript:
-5 of 6 figures were oversized for the new column and were scaled to fit it.
+Any inline drawing wider than the column it now sits in is scaled down to fit, aspect ratio locked (`wp:extent` and the picture shape's own `a:xfrm/a:ext` are scaled by the same factor, so the two records Word keeps for one image cannot disagree and distort it). Pixels are never touched. On that manuscript: 5 of 6 figures were oversized for the new column and were scaled to fit it.
 
 ### Equation numbers placed by typing spaces to the margin
 
-The same manuscript had equation numbers wrapping onto their own line —
-sometimes above the equation itself. The cause was a habit common enough to be
-almost universal in hand-formatted manuscripts: type the equation, hit the
-space bar until the cursor reaches the page's right margin, then type `(3)`.
-Invisible in the single-column source, because the padding was eyeballed
-against that page's margin — carried into a column less than half as wide, the
-same run of spaces now overshoots the new margin, and Word wraps the number.
+The same manuscript had equation numbers wrapping onto their own line sometimes above the equation itself. The cause was a habit common enough to be almost universal in hand-formatted manuscripts: type the equation, hit the space bar until the cursor reaches the page's right margin, then type `(3)`.
+Invisible in the single-column source, because the padding was eyeballed against that page's margin carried into a column less than half as wide, the same run of spaces now overshoots the new margin, and Word wraps the number.
 
-The fix uses the same mechanism Word's own equation numbering does: the
-run of at least 6 literal spaces immediately before the number is replaced
-with one real tab character, and a right tab stop is written at the new
-column's actual width — not trusting whatever `w:tabs` the paragraph already
-carries, since those are as often stale indent tabs from the source layout as
-the number's own stop. On the Nebbar manuscript: 59 equation numbers used this
-padding and were converted.
+The fix uses the same mechanism Word's own equation numbering does: the run of at least 6 literal spaces immediately before the number is replaced with one real tab character, and a right tab stop is written at the new column's actual width not trusting whatever `w:tabs` the paragraph already carries, since those are as often stale indent tabs from the source layout as the number's own stop. On the Nebbar manuscript: 59 equation numbers used this padding and were converted.
 
 ### What neither route does
 
@@ -369,13 +266,13 @@ padding and were converted.
 
 A manuscript reformatted to IEEEtran produced a `main.tex` that compiled
 without a single error and contained the title, the abstract, the keywords and
-the bibliography — and none of the paper. Three defects lined up, and the
+the bibliography and none of the paper. Three defects lined up, and the
 combination is instructive because each one alone is survivable:
 
 1. **The title was styled `Heading 1`.** Every real section was therefore
    nested beneath it, and the section tree had exactly one top-level node.
 2. **A front-matter role skipped the whole subtree.** Marking that node
-   `title` in the Sections panel — the obvious choice, since it *is* the title —
+   `title` in the Sections panel the obvious choice, since it *is* the title —
    made the renderer return nothing for the node *and its descendants*.
 3. **Nothing counted what reached the page.** The render was reported as
    successful, and LaTeX, having been handed a valid document, compiled it.
@@ -413,7 +310,7 @@ mistake: deciding a width from the wrong evidence.
 
 | Symptom in the PDF | Cause | Fix |
 |---|---|---|
-| A four-column table printed over the text in the next column | floats spanned both columns only when they had **more than four columns** — a count, not a width | the widest row is measured in characters; anything wider than a column spans, and cells are set in fixed-width `p{}` columns so they wrap |
+| A four-column table printed over the text in the next column | floats spanned both columns only when they had **more than four columns** a count, not a width | the widest row is measured in characters; anything wider than a column spans, and cells are set in fixed-width `p{}` columns so they wrap |
 | Text vanishing past the right edge of the page | display equations were emitted as one line whatever their length | two formulas joined by `\quad\quad` (the single-column Word habit) are broken into an `aligned` block; a single formula that is genuinely too wide is scaled with `\resizebox` and reported in `BUILD.md` |
 | `(3) (3)` after every equation | the author's typed number was kept *and* LaTeX added its own | the author's number is stripped; LaTeX's is the one `\ref` agrees with |
 | Every figure squeezed into one column, or printed across the neighbour | the placed width was passed as a hard-coded `0.0` | the figure's own shape decides: wider than 1.8:1 spans both columns, anything squarer stays in one |
@@ -430,24 +327,24 @@ Measured on the manuscript that prompted this, IEEEtran, 12 pages:
 
 Heading detection is guesswork whenever the author applied no heading styles,
 which is most of the time. On a real manuscript one section ended up holding
-**76 blocks** — most of the paper — because the author had used only a handful
+**76 blocks** most of the paper because the author had used only a handful
 of headings.
 
 *(An earlier version of this note blamed the heuristic for promoting a sentence
 to a heading. That was wrong: checking the OOXML shows the author had styled it
 `heading 1` themselves. The parser was right; the manuscript simply has coarse
-sections. The lesson stands — you often want finer boundaries than the file
-records — but the tool was not at fault.)*
+sections. The lesson stands you often want finer boundaries than the file
+records but the tool was not at fault.)*
 
-No amount of tuning removes that class of error — the information is genuinely
+No amount of tuning removes that class of error the information is genuinely
 absent from the file. So the Sections tab has three modes:
 
-- **Guided** (default) — the flow Wiley's submission system uses: one section at
+- **Guided** (default) the flow Wiley's submission system uses: one section at
   a time, the manuscript text shown with the candidate range highlighted, adjust,
   **Confirm**, advance. The steps are the sections the target journal requires,
   plus whatever was already detected.
-- **Quick** — assign roles to the sections that were detected.
-- **Table** (advanced) — every block at once with a `heading` checkbox, level
+- **Quick** assign roles to the sections that were detected.
+- **Table** (advanced) every block at once with a `heading` checkbox, level
   and role.
 
 All three go through `flatten()` → `rebuild()` / `apply_ranges()`, which are
@@ -470,7 +367,7 @@ Partly, and *which* parts matters.
 **Not trainable, and must never be:** reading OMML, extracting figures, counting
 tables, restyling a DOCX, emitting LaTeX. These are deterministic
 transformations of a known file format. A model there would make the same input
-give different output on two runs — disqualifying for a manuscript — and its
+give different output on two runs disqualifying for a manuscript and its
 mistakes would be silent.
 
 **Genuinely learnable**, because the information is ambiguous even to a careful
@@ -488,7 +385,7 @@ milliseconds on a CPU; coefficients you can read when it misbehaves. Character
 n-grams rather than words, so a French or Polish manuscript still works.
 
 Training runs **in the app**: sidebar **Local training** for the one-button
-version, **Advanced → Training** for the full panel — how much data you have and
+version, **Advanced → Training** for the full panel how much data you have and
 what each model still needs, the seed corpus, folder harvesting, the training run
 with its cross-validated scores, a box to try a line of text against the trained
 model, and the raw `corrections.jsonl`. That is where the corrections are
@@ -511,7 +408,7 @@ python train_local.py --reset              # drop the models, keep the data
 
 **Word heading styles are free ground truth.** A manuscript whose author applied
 `Heading 1` has already labelled its own headings. Two real papers yielded 41
-headings and 219 body lines — 253 labelled examples — at zero annotation cost.
+headings and 219 body lines 253 labelled examples at zero annotation cost.
 `--harvest` reads any folder of `.docx` you already have. Files without heading
 styles are skipped, because labelling them with the same heuristic the model is
 meant to replace teaches it nothing.
@@ -530,7 +427,7 @@ Corpus: 591 examples (338 seed + 253 harvested from two papers).
 | Heading detector | **F1 0.885** |
 | Role classifier | accuracy **0.50** over the 21 roles with ≥2 examples |
 
-The role classifier is weak — 222 examples across 22 classes is about ten each.
+The role classifier is weak 222 examples across 22 classes is about ten each.
 It is used only above 0.75 confidence, so most of its guesses are discarded.
 
 **The first trained model made the output worse**, and the fix is worth
@@ -539,10 +436,10 @@ them `keywords` at 91 % confidence. Two causes:
 
 1. The seed corpus was all *long* body text and *short* headings, so the model
    learned "short and capitalised means heading". Fixed by adding ~70 short
-   non-headings — nomenclature entries, zone labels, captions, units.
+   non-headings nomenclature entries, zone labels, captions, units.
 2. More fundamentally, a confident model was allowed to *override* the rules.
-   It no longer can. Structural disqualifiers — trailing semicolon, a units
-   bracket, `Fig. 3.`, an e-mail — are knowledge character n-grams cannot
+   It no longer can. Structural disqualifiers trailing semicolon, a units
+   bracket, `Fig. 3.`, an e-mail are knowledge character n-grams cannot
    acquire from a few hundred examples, so the rules keep the veto and the model
    only breaks ties the rules leave open.
 
@@ -552,7 +449,7 @@ After the fix the model adds two correct labels the lexicon cannot reach
 
 Training data is **your own corrections**: every heading you fix in the Precise
 editor is appended to `models/corrections.jsonl`. Only rows whose value actually
-changed are recorded — feeding the heuristic's own guesses back in would teach
+changed are recorded feeding the heuristic's own guesses back in would teach
 the model to reproduce the mistakes it exists to fix.
 
 Everything runs locally; nothing is uploaded. Trained models are picked up
@@ -560,7 +457,7 @@ automatically on the next parse, and retypeset falls back to the rule-based path
 unchanged when they are absent. The model only overrides the rules above 70 %
 confidence, and role predictions below 55 % are discarded.
 
-Smoke-tested on 123 synthetic examples: heading F1 1.00 (inflated — templated
+Smoke-tested on 123 synthetic examples: heading F1 1.00 (inflated templated
 data leaks across folds), role accuracy 0.73. Expect the real numbers to be
 lower and the heading detector to be the more useful of the two.
 
@@ -585,7 +482,7 @@ JSON file naming a family and overriding a few numbers.
 | `springer_sn` | no | inferred; verify per journal |
 | `diagnostyka` | no | inferred from the journal's own Word template |
 
-`verified: false` profiles never report `fail`, only `warn` — a false rejection
+`verified: false` profiles never report `fail`, only `warn` a false rejection
 wastes more of your time than a missed one.
 
 Every numeric limit carries a `source` URL in the JSON.
@@ -612,7 +509,7 @@ Neither raises a diagnostic. This is precisely why `retypeset.oox` reads the OOX
 | Embedded images | 13 / 13 |
 | Word retention | 98.2 % (residual = headers/footers and fragments < 25 chars) |
 | Duplicated paragraphs | 1 |
-| Figure captions recovered | 7 / 13 (6 have none in the source — 5 are author photographs) |
+| Figure captions recovered | 7 / 13 (6 have none in the source 5 are author photographs) |
 
 The equation conversion is clean, e.g.
 
@@ -627,7 +524,7 @@ Z_{2} = R_{2} + jX_{2} = Z_{\text{AB}} + 0.2 \bullet Z_{\text{AB}}
 A harder file, and it exposed three things the first one could not.
 
 **1. Equation-numbering tables.** Word has no numbered-equation construct, so
-authors use an invisible two-column table — equation left, `(n)` right. In this
+authors use an invisible two-column table equation left, `(n)` right. In this
 manuscript that was **30 of 32 tables and 69 of 134 equations**. Treating them as
 tables inflated the table count, left 69 equations unnumbered, fired caption
 warnings on 25 non-tables, and would have made a renderer emit `tabular` where
@@ -650,7 +547,7 @@ had not happened:
 
 Tables now read 32 / 32, and the real table count is 8.
 
-Compliance failures dropped from 4 to 1 (IEEE) — the remaining one is genuine:
+Compliance failures dropped from 4 to 1 (IEEE) the remaining one is genuine:
 `fig4` at 1002 px, `fig5` and `fig6` at 720 px, all under IEEE's 1050 px floor.
 
 ## Compliance results for the first test manuscript
@@ -675,7 +572,7 @@ Independent of tooling, that file will fail technical checks at most publishers:
 
 - **All 9 raster figures are below 300 dpi at single-column width** (102–715 px; ≥ 1063 px required). Elsevier, IEEE and Springer all reject at this stage.
 - **3 figures are EMF.** pdfLaTeX cannot include them, and Word renders them unpredictably outside Windows. Convert to PDF (vector) or 600 dpi PNG.
-- **Figure order is inconsistent** — "Fig. 4" appears in the text before "Fig. 3".
+- **Figure order is inconsistent** "Fig. 4" appears in the text before "Fig. 3".
 - **The bibliography is hand-typed**, with no Zotero/Mendeley/EndNote field codes, and 16 of 35 entries carry no DOI. Automatic numeric ↔ author-year conversion is unreliable until the bibliography is re-linked in a reference manager.
 - **No heading styles are applied**; 3 headings had to be recovered from bold/numbered paragraphs, and only 3 of 9 top-level sections match the canonical role lexicon.
 
@@ -703,8 +600,8 @@ manuscripts under `tests/samples/`, your own manuscript in `paper/`,
 training data derived from your files. `git add -A` publishes all of it, and
 GitHub keeps deleted blobs reachable by hash, so it cannot be taken back.
 
-`tools/make_release.py` copies only what is named in an allowlist — not an
-ignore list — and prints what it withheld and why, every run:
+`tools/make_release.py` copies only what is named in an allowlist not an
+ignore list and prints what it withheld and why, every run:
 
 ```bash
 python tools/make_release.py --check      # list, copy nothing
@@ -734,7 +631,7 @@ needed, commits and pushes. If `paper/` is present it stops and asks, even
 though you built the folder yourself.
 
 The token is read from `GITHUB_TOKEN`, from `gh auth token`, or asked for
-without echoing, and is passed to one `git push` as an `http.extraheader` — so
+without echoing, and is passed to one `git push` as an `http.extraheader` so
 it never reaches `.git/config`, the remote URL, or your shell history. Scope
 `repo` is enough; add `workflow` only if you publish with `--with-ci`.
 
@@ -748,7 +645,7 @@ it never reaches `.git/config`, the remote URL, or your shell history. Scope
 
 0. **Verify the shipped profiles.** 23 of the 28 were transcribed rather than
    read from the live guide, and until each is checked they are advisory only.
-1. **Section-role labelling.** The lexicon resolves 3 of 9 sections here. This is the one place an LLM belongs at runtime — classification only, constrained to the `SectionRole` enum, with the result shown for confirmation.
+1. **Section-role labelling.** The lexicon resolves 3 of 9 sections here. This is the one place an LLM belongs at runtime classification only, constrained to the `SectionRole` enum, with the result shown for confirmation.
 2. **Reference ingestion.** Replace the regex parser with AnyStyle or GROBID → CSL-JSON, then Crossref lookup by title to fill DOIs. Once references are CSL-JSON, restyling across journals is `citeproc` + a CSL file, and the Zotero style repository already covers roughly 10,000 journals.
 3. **Style-profile schema** (~40 declarative fields per journal) + profiles for 3 target journals.
 4. **Renderers.** `python-docx` into the publisher's own `.dotx`; Jinja2 (with `\VAR{}`/`\BLOCK{}` delimiters, since `{{ }}` collides with TeX) into `elsarticle` / `IEEEtran`.
@@ -756,6 +653,6 @@ it never reaches `.git/config`, the remote URL, or your shell history. Scope
 
 ## Scope note
 
-Elsevier, Springer Nature, Wiley and IEEE all accept *format-free* initial submissions; strict formatting binds at revision and acceptance. And roughly 15 template families (elsarticle, IEEEtran, sn-jnl, Wiley, MDPI, T&F, ACS, RSC, APS, AIP, IOP, …) cover the large majority of journals — per-journal variation is mostly reference style, abstract limits and section structure.
+Elsevier, Springer Nature, Wiley and IEEE all accept *format-free* initial submissions; strict formatting binds at revision and acceptance. And roughly 15 template families (elsarticle, IEEEtran, sn-jnl, Wiley, MDPI, T&F, ACS, RSC, APS, AIP, IOP, …) cover the large majority of journals per-journal variation is mostly reference style, abstract limits and section structure.
 
 So the target is **~15 renderers plus a few thousand thin JSON profiles**, not thousands of templates. The defensible wedge is high-fidelity **DOCX → DOCX** restyling with equations, figures and citations intact, which is currently poorly served.
