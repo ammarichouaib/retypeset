@@ -1521,15 +1521,19 @@ class DocxParser:
                 for cell in row:
                     for b in cell.blocks:
                         ir_corpus.extend(_block_texts(b))
-        blob = "\n".join(x for x in ir_corpus if x)
+        # Compare on a math-free, alphanumeric key. The OOXML scan replaces each
+        # inline equation with a sentinel, whereas the IR renders it as $...$;
+        # comparing raw text therefore flagged every paragraph with inline math
+        # in its first 60 characters as "lost" (15 false positives on M2).
+        blob = "\n".join(_match_key(x) for x in ir_corpus if x)
 
         missing: list[tuple[int, str]] = []
         for p in self.scan.paragraphs:
             t = _norm_ws(p.text)
-            if len(t) < 25:            # too short to match reliably
+            key = _match_key(t)
+            if len(key) < 20:          # too short to match reliably
                 continue
-            probe = t[:60]
-            if probe not in blob:
+            if key[:40] not in blob:
                 missing.append((p.index, t))
 
         if not missing:
@@ -1614,6 +1618,15 @@ class DocxParser:
 def _norm_ws(s: str) -> str:
     """Collapse whitespace and the math sentinel for corpus comparison."""
     return re.sub(r"\s+", " ", s.replace("", " ")).strip()
+
+
+_INLINE_MATH_RE = re.compile(r"\$[^$]*\$")
+
+
+def _match_key(s: str) -> str:
+    """Math-free, lower-case alphanumeric key for source/IR text matching."""
+    s = _INLINE_MATH_RE.sub(" ", _norm_ws(s))   # _norm_ws drops the sentinel
+    return re.sub(r"[^0-9a-z]", "", s.lower())
 
 
 def _plain(nodes: Iterable[dict]) -> str:

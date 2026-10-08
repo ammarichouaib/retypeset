@@ -70,8 +70,10 @@ tests/test_docx_layout.py
 tests/test_latex_body.py
 tests/test_retypeset.py
 tests/test_template_profile.py
+tools/eval_corpus.py
 tools/make_release.py
 tools/publish_github.py
+tools/run_experiments.py
 train_local.py
 ui/__init__.py
 ui/check.py
