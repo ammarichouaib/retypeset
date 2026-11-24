@@ -40,6 +40,12 @@ def _docx_ground_truth(path: str | Path) -> dict:
             rels_xml = ""
         media = [n for n in names if n.startswith("word/media/")]
 
+    # mc:Fallback holds a second, legacy (VML) copy of content that is already
+    # present under mc:Choice -- for example every picture in a grouped drawing.
+    # Counting inside it inflated the ground truth (found on a public document
+    # with 112 pictures counted as 184), so fallbacks are removed first.
+    doc = re.sub(r"<mc:Fallback\b[^>]*/>|<mc:Fallback\b[^>]*>.*?</mc:Fallback>", "", doc, flags=re.S)
+
     # Authoritative image count: <pic:pic> elements, i.e. actual pictures.
     #
     # Two wrong ways to count this, both of which we tried:

@@ -155,6 +155,39 @@ def excluded(with_paper: bool, with_ci: bool) -> list[tuple[str, str]]:
     return out
 
 
+def _remove(item: Path) -> None:
+    """Delete a file or folder on Windows/OneDrive, where files are often marked
+    read-only or briefly locked by the sync client."""
+    import os
+    import stat
+    import time
+
+    def _onerror(func, path, _exc):
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except PermissionError:
+            time.sleep(1.0)          # OneDrive may hold the file for a moment
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+    for attempt in range(3):
+        try:
+            if item.is_dir():
+                shutil.rmtree(item, onerror=_onerror)
+            elif item.exists():
+                os.chmod(item, stat.S_IWRITE)
+                item.unlink()
+            return
+        except PermissionError:
+            if attempt == 2:
+                raise PermissionError(
+                    f"Windows will not let me delete {item}. Pause OneDrive syncing "
+                    "(OneDrive icon > Pause syncing), close any window or editor using "
+                    "that folder, delete the folder by hand, and run again.") from None
+            time.sleep(2.0)
+
+
 def _drop(p: Path) -> bool:
     parts = set(p.parts)
     if parts & {"__pycache__", ".pytest_cache", "node_modules", "ci"}:
@@ -216,7 +249,7 @@ def main() -> int:
         for item in out.iterdir():
             if item.name == ".git":
                 continue
-            shutil.rmtree(item) if item.is_dir() else item.unlink()
+            _remove(item)
             removed += 1
         if removed:
             print(f"cleared {removed} item(s) from {out.name} "

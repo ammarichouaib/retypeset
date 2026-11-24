@@ -255,6 +255,10 @@ def scan(docx_path: str | Path) -> OoxScan:
 
         for vml in p.iter(f"{{{V}}}imagedata"):
             rid = vml.get(f"{{{R}}}id") or ""
+            # A VML picture under mc:Fallback duplicates a DrawingML picture
+            # already taken from mc:Choice; taking both doubles the figure.
+            if any(isinstance(a.tag, str) and a.tag.endswith("}Fallback") for a in vml.iterancestors()):
+                continue
             if rid in rels and _owns(p, vml):
                 images.append(ImageRef(
                     rid=rid, filename=rels[rid], para_index=idx,
